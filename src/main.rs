@@ -320,7 +320,10 @@ unsafe fn create_logical_device(
         vec![]
     };
 
-    let extensions = vec![];
+    let extensions = DEVICE_EXTENSIONS
+        .iter()
+        .map(|n| n.as_ptr())
+        .collect::<Vec<_>>();
 
     let features = vk::PhysicalDeviceFeatures::builder();
 
