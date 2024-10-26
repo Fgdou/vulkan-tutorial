@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::ffi::CStr;
 use std::os::raw::c_void;
 
-use vulkanalia::vk::{ExtDebugUtilsExtension, KhrXcbSurfaceExtension, XcbSurfaceCreateInfoKHR};
+use vulkanalia::vk::{ExtDebugUtilsExtension, KhrSurfaceExtension, KhrXcbSurfaceExtension, XcbSurfaceCreateInfoKHR};
 
 use anyhow::{anyhow, Result};
 use log::*;
@@ -238,6 +238,7 @@ unsafe fn check_physical_device(
 #[derive(Copy, Clone, Debug)]
 struct QueueFamilyIndices {
     graphics: u32,
+    present: u32,
 }
 
 impl QueueFamilyIndices {
@@ -254,8 +255,20 @@ impl QueueFamilyIndices {
             .position(|p| p.queue_flags.contains(vk::QueueFlags::GRAPHICS))
             .map(|i| i as u32);
 
-        if let Some(graphics) = graphics {
-            Ok(Self{graphics})
+        let mut present = None;
+        for (index, properties) in properties.iter().enumerate() {
+            if instance.get_physical_device_surface_support_khr(
+                physical_device,
+                index as u32,
+                data.surface,
+            )? {
+                present = Some(index as u32);
+                break;
+            }
+        }
+
+        if let (Some(graphics), Some(present)) = (graphics, present) {
+            Ok(Self{graphics, present})
         } else {
             Err(anyhow!(SuitabilityError("Missing required queue families.")))
         }
