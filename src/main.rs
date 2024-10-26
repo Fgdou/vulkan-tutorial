@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::ffi::CStr;
 use std::os::raw::c_void;
 
-use vulkanalia::vk::ExtDebugUtilsExtension;
+use vulkanalia::vk::{ExtDebugUtilsExtension, KhrXcbSurfaceExtension, XcbSurfaceCreateInfoKHR};
 
 use anyhow::{anyhow, Result};
 use log::*;
@@ -164,6 +164,9 @@ impl App {
         let entry = Entry::new(loader).map_err(|b| anyhow!("{}", b))?;
         let mut data = AppData::default();
         let instance = create_instance(window, &entry, &mut data)?;
+
+        data.surface = vk_window::create_surface(&instance, &window, &window)?;
+
         pick_physical_device(&instance, &mut data)?;
         let device = create_logical_device(&entry, &instance, &mut data)?;
         Ok(Self { entry, instance, data, device })
@@ -190,6 +193,7 @@ struct AppData {
     messenger: vk::DebugUtilsMessengerEXT,
     physical_device: vk::PhysicalDevice,
     graphics_queue: vk::Queue,
+    surface: vk::SurfaceKHR,
 }
 
 #[derive(Debug, Error)]
