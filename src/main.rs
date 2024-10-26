@@ -233,6 +233,9 @@ unsafe fn create_swapchain(
         .old_swapchain(vk::SwapchainKHR::null());
 
     data.swapchain = device.create_swapchain_khr(&info, None)?;
+    data.swapchain_images = device.get_swapchain_images_khr(data.swapchain)?;
+    data.swapchain_format = surface_format.format;
+    data.swapchain_extent = extent;
 
     Ok(())
 
@@ -247,6 +250,9 @@ struct AppData {
     present_queue: vk::Queue,
     surface: vk::SurfaceKHR,
     swapchain: vk::SwapchainKHR,
+    swapchain_images: Vec<vk::Image>,
+    swapchain_format: vk::Format,
+    swapchain_extent: vk::Extent2D,
 }
 
 #[derive(Debug, Error)]
