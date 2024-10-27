@@ -140,7 +140,10 @@ fn main() -> Result<()> {
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                     unsafe { app.destroy(); }
-                }
+                },
+                WindowEvent::Resized(_) => {
+                    app.resized = true;
+                },
                 _ => {}
             }
             _ => {}
