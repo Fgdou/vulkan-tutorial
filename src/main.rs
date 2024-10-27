@@ -158,6 +158,7 @@ struct App {
     data: AppData,
     device: Device,
     frame: usize,
+    resized: bool,
 }
 
 impl App {
@@ -181,7 +182,7 @@ impl App {
         create_command_buffers(&device, &mut data)?;
         create_sync_objects(&device, &mut data)?;
 
-        Ok(Self { entry, instance, data, device, frame: 0 })
+        Ok(Self { entry, instance, data, device, frame: 0, resized: false })
     }
 
     /// Renders a frame for our Vulkan app.
@@ -236,7 +237,18 @@ impl App {
             .swapchains(swapchains)
             .image_indices(image_indices);
 
-        self.device.queue_present_khr(self.data.present_queue, &present_info)?;
+        let result = self.device.queue_present_khr(self.data.present_queue, &present_info);
+
+        let changed = result == Ok(vk::SuccessCode::SUBOPTIMAL_KHR)
+            || result == Err(vk::ErrorCode::OUT_OF_DATE_KHR);
+
+        if self.resized || changed {
+            self.resized = false;
+            self.recreate_swapchain(window)?;
+        } else if let Err(e) = result {
+            return Err(anyhow!(e));
+        }
+
         self.device.queue_wait_idle(self.data.present_queue)?;
 
         self.frame = (self.frame + 1) % MAX_FRAMES_IN_FLIGHT;
