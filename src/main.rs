@@ -186,15 +186,19 @@ impl App {
 
     /// Renders a frame for our Vulkan app.
     unsafe fn render(&mut self, window: &Window) -> Result<()> {
-        let image_index = self
+        let result = self
             .device
             .acquire_next_image_khr(
                 self.data.swapchain,
                 u64::MAX,
                 self.data.image_available_semaphores[self.frame],
                 vk::Fence::null(),
-            )?
-            .0 as usize;
+            );
+        let image_index = match result {
+            Ok((image_index, _)) => image_index as usize,
+            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => return self.recreate_swapchain(window),
+            Err(e) => return Err(anyhow!(e)),
+        };
 
         if !self.data.images_in_flight[image_index].is_null() {
             self.device.wait_for_fences(
@@ -235,13 +239,14 @@ impl App {
         self.device.queue_present_khr(self.data.present_queue, &present_info)?;
         self.device.queue_wait_idle(self.data.present_queue)?;
 
-        self.frame = (self.frame+1) % MAX_FRAMES_IN_FLIGHT;
+        self.frame = (self.frame + 1) % MAX_FRAMES_IN_FLIGHT;
 
         Ok(())
     }
 
     /// Destroys our Vulkan app.
     unsafe fn destroy(&mut self) {
+        self.destroy_swapchain();
         self.data.in_flight_fences
             .iter()
             .for_each(|f| self.device.destroy_fence(*f, None));
@@ -252,6 +257,28 @@ impl App {
             .iter()
             .for_each(|s| self.device.destroy_semaphore(*s, None));
         self.device.destroy_command_pool(self.data.command_pool, None);
+        self.device.destroy_device(None);
+        if VALIDATION_ENABLED {
+            self.instance.destroy_debug_utils_messenger_ext(self.data.messenger, None);
+        }
+        self.instance.destroy_instance(None);
+    }
+
+    unsafe fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
+        self.device.device_wait_idle()?;
+        self.destroy_swapchain();
+        create_swapchain(window, &self.instance, &self.device, &mut self.data)?;
+        create_swapchain_image_views(&self.device, &mut self.data)?;
+        create_render_pass(&self.instance, &self.device, &mut self.data)?;
+        create_pipeline(&self.device, &mut self.data)?;
+        create_framebuffers(&self.device, &mut self.data)?;
+        create_command_buffers(&self.device, &mut self.data)?;
+        self.data
+            .images_in_flight
+            .resize(self.data.swapchain_images.len(), vk::Fence::null());
+        Ok(())
+    }
+    unsafe fn destroy_swapchain(&mut self) {
         self.data.framebuffers
             .iter()
             .for_each(|f| self.device.destroy_framebuffer(*f, None));
@@ -263,11 +290,6 @@ impl App {
             .iter()
             .for_each(|v| self.device.destroy_image_view(*v, None));
         self.device.destroy_swapchain_khr(self.data.swapchain, None);
-        self.device.destroy_device(None);
-        if VALIDATION_ENABLED {
-            self.instance.destroy_debug_utils_messenger_ext(self.data.messenger, None);
-        }
-        self.instance.destroy_instance(None);
     }
 }
 
